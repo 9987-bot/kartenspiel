@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kartenspiel">
+<meta name="theme-color" content="#0b0708">
+<title>Kartenspiel</title>
+<style>
+:root{
+  --bg:#0b0708; --panel:#150e10; --panel2:#1f1518; --line:rgba(212,175,122,.16);
+  --text:#f4ebe3; --muted:#a39188; --gold:#d4af7a; --gold2:#f0d9b0; --wine:#7d1632; --rose:#c2375c;
+  --ok:#6fae8c; --warn:#d9a24a; --err:#d8566f; --r:18px;
+  --serif:Baskerville,"Hoefler Text","Iowan Old Style",Palatino,Georgia,serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{background:
+  radial-gradient(120% 60% at 50% -10%,rgba(125,22,50,.38),transparent 60%),
+  radial-gradient(80% 50% at 50% 110%,rgba(212,175,122,.07),transparent 60%),var(--bg);
+  background-attachment:fixed;min-height:100vh}
+main{max-width:520px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top)) 18px 0;min-height:100vh;display:flex;flex-direction:column;gap:16px}
+h1{font:italic 600 36px/1.05 var(--serif);margin:6px 0 0;color:var(--gold2);letter-spacing:.01em}
+h2{font-size:12px;margin:0;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:600}
+p{margin:0}
+.muted{color:var(--muted);font-size:14px}
+.center{text-align:center}
+.panel{background:linear-gradient(180deg,rgba(255,255,255,.025),transparent),var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
+button{font:inherit;color:inherit;border:0;border-radius:14px;padding:15px 16px;background:var(--panel2);cursor:pointer;font-weight:600;transition:transform .08s ease,opacity .15s}
+button:active{transform:scale(.97)}
+button:disabled{opacity:.3;cursor:default}
+button.primary{background:linear-gradient(180deg,#e3c391,#c39a5f);color:#1a1108;box-shadow:0 6px 22px rgba(212,175,122,.18)}
+button.wine{background:linear-gradient(180deg,#a8254a,#7d1632);color:#fff;box-shadow:0 6px 22px rgba(125,22,50,.4)}
+button.ghost{background:transparent;border:1px solid var(--line);font-weight:500;color:var(--text)}
+button.small{padding:9px 13px;font-size:14px;border-radius:11px}
+.row{display:flex;gap:10px;align-items:center}
+.row>*{flex:1}
+.stack{display:flex;flex-direction:column;gap:10px}
+input[type=text]{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:13px;width:100%}
+input[type=text]:focus{outline:none;border-color:var(--gold)}
+input.title{font:italic 600 32px/1.1 var(--serif);color:var(--gold2);background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;padding:4px 0 8px}
+.file{position:relative;overflow:hidden;display:block}
+.file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.deck{display:flex;align-items:center;gap:10px;padding:12px;background:var(--panel2);border-radius:14px}
+.deck .name{flex:1;font:600 21px/1.15 var(--serif);word-break:break-word}
+.deck .meta{font:400 13px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--muted);margin-top:2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 13px;border-radius:999px;background:transparent;border:1px solid var(--line);font-size:14px;font-weight:500;color:var(--muted);display:flex;gap:7px;align-items:center}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--c);opacity:.45}
+.chip.on{color:var(--text);border-color:var(--c);background:rgba(255,255,255,.04)}
+.chip.on i{opacity:1}
+.seg{display:flex;background:var(--panel2);border-radius:13px;padding:4px;gap:4px}
+.seg button{flex:1;padding:10px 6px;background:transparent;font-size:14px;color:var(--muted);border-radius:10px}
+.seg button.on{background:rgba(212,175,122,.16);color:var(--gold2)}
+.msg{font-size:14px;padding:9px 11px;border-radius:10px;background:var(--panel2)}
+.msg.err{border-left:3px solid var(--err)}
+.msg.warn{border-left:3px solid var(--warn)}
+.msg.ok{border-left:3px solid var(--ok)}
+.msg code{font-size:12px;color:var(--muted);display:block;margin-top:3px;word-break:break-all}
+details summary{cursor:pointer;color:var(--muted);font-size:14px}
+.pv{display:flex;gap:8px;font-size:14px;padding:7px 0;border-bottom:1px solid var(--line)}
+.pv b{color:var(--gold);font-weight:600;flex:none;width:18px}
+.check{display:flex;align-items:center;gap:13px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;font-weight:500;text-align:left;width:100%;font-size:17px}
+.check .box{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--gold);flex:none;display:grid;place-items:center;font-size:14px;color:#1a1108}
+.check.on .box{background:var(--gold)}
+.check.on span:last-child{color:var(--muted)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.link{background:none;padding:6px 0;color:var(--muted);font-weight:500;font-size:14px}
+.bar{position:sticky;bottom:0;margin-top:auto;padding:14px 0 calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;background:linear-gradient(180deg,transparent,var(--bg) 26%)}
+/* Spiel */
+.score{display:flex;gap:10px}
+.score .p{flex:1;padding:8px 2px;border-bottom:2px solid var(--line);opacity:.55;transition:opacity .2s}
+.score .p:last-child{text-align:right}
+.score .p.act{border-color:var(--gold);opacity:1}
+.score .n{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.score .v{font:600 34px/1 var(--serif);color:var(--gold2);margin-top:2px}
+.prog{height:2px;background:var(--line);border-radius:2px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--gold);transition:width .3s}
+.turn{text-align:center;font:italic 500 30px/1.15 var(--serif);margin-top:10px}
+.turn small{display:block;font:500 12px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.piles{display:flex;gap:14px;justify-content:center;margin-top:6px}
+.pile{flex:1;max-width:210px;aspect-ratio:5/7;border-radius:18px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;align-items:center;position:relative;
+  box-shadow:0 2px 0 #24090f,0 4px 0 #1a070b,0 6px 0 #12050a,0 18px 34px rgba(0,0,0,.55)}
+.pile .lbl{font:italic 600 24px/1.1 var(--serif)}
+.pile .cnt{font-size:12px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;opacity:.75}
+.backface{background:
+  radial-gradient(circle at 50% 50%,rgba(212,175,122,.16),transparent 55%),
+  repeating-linear-gradient(45deg,rgba(212,175,122,.07) 0 1px,transparent 1px 11px),
+  repeating-linear-gradient(-45deg,rgba(212,175,122,.07) 0 1px,transparent 1px 11px),
+  linear-gradient(160deg,#5c1026,#2a0810);
+  border:1px solid rgba(212,175,122,.45);color:var(--gold2)}
+.backface.self{background:
+  radial-gradient(circle at 50% 50%,rgba(212,175,122,.18),transparent 55%),
+  repeating-linear-gradient(45deg,rgba(212,175,122,.08) 0 1px,transparent 1px 11px),
+  repeating-linear-gradient(-45deg,rgba(212,175,122,.08) 0 1px,transparent 1px 11px),
+  linear-gradient(160deg,#2a2019,#120d0b)}
+.orn{font-size:26px;color:var(--gold);opacity:.9}
+.flip{perspective:1200px;height:min(52vh,430px);margin-top:4px}
+.flip .inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.flip.rev .inner{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;border-radius:24px;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 24px 50px rgba(0,0,0,.6);display:flex;flex-direction:column}
+.face.back{align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;cursor:pointer}
+.face.back .for{font:italic 600 34px/1.1 var(--serif)}
+.face.back .hint{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);opacity:.85;animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.face.front{transform:rotateY(180deg);padding:22px;gap:12px;
+  background:linear-gradient(165deg,#241619,#130c0e);border:1px solid rgba(212,175,122,.45)}
+.face.front::before{content:"";position:absolute;inset:7px;border:1px solid rgba(212,175,122,.14);border-radius:18px;pointer-events:none}
+.who{font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.who.w{color:#e58aa2}
+.ctext{font:400 25px/1.32 var(--serif);flex:1;display:flex;align-items:center;justify-content:center;text-align:center;overflow:auto}
+.ctext.m{font-size:21px}.ctext.l{font-size:18px}
+.foot{display:flex;justify-content:space-between;align-items:center;position:relative}
+.tag{font-size:12px;letter-spacing:.12em;text-transform:uppercase;display:flex;gap:7px;align-items:center;color:var(--muted)}
+.tag i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.pts{font:600 22px/1 var(--serif);color:var(--gold2)}
+.timer{align-self:center;position:relative;padding:9px 18px;border-radius:999px;background:transparent;border:1px solid var(--gold);color:var(--gold2);font-size:15px;font-variant-numeric:tabular-nums}
+.timer.run{background:rgba(212,175,122,.14)}
+.timer.done{background:var(--rose);border-color:var(--rose);color:#fff;animation:pulse .7s ease-in-out 4}
+.acts{display:none;flex-direction:column;gap:10px}
+.rev~.bar .acts,.bar.show .acts{display:flex}
+.rev~.bar .pre,.bar.show .pre{display:none}
+.note{font-size:13px;color:var(--muted);text-align:center}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:grid;place-items:center;padding:20px;z-index:10;backdrop-filter:blur(4px)}
+.overlay .panel{max-width:420px;width:100%}
+.overlay h2{font:italic 600 26px/1.1 var(--serif);letter-spacing:0;text-transform:none;color:var(--gold2)}
+pre.fmt{background:var(--panel2);border-radius:10px;padding:10px;font-size:12.5px;overflow:auto;margin:0;white-space:pre;color:var(--text)}
+.res{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:15px}
+.big{font:italic 600 44px/1.05 var(--serif);text-align:center;color:var(--gold2);margin:14px 0 4px}
+.final{display:flex;justify-content:center;align-items:baseline;gap:16px;font:600 64px/1 var(--serif);color:var(--gold2)}
+.final span{font-size:30px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.flip .inner{transition:none}.hint{animation:none}}
+</style>
+</head>
+<body>
+<main id="app"></main>
+
+<script>
+"use strict";
+/* ---------- Storage (localStorage, optional) ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+const K_DECKS = "kg.decks.v1", K_GAME = "kg.game.v2", K_PREFS = "kg.prefs.v2", K_PLAYED = "kg.played.v1";
+
+/* ---------- Parser: exakt nach IMPORTDECK-Formatregeln ---------- */
+function parseDeck(raw){
+  const errors = [], warnings = [];
+  const text = raw.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+  const lines = text.split("\n");
+  // Eine abschließende Leerzeile (Zeilenumbruch am Dateiende) ist unkritisch
+  while (lines.length && lines[lines.length-1] === "") lines.pop();
+  const err = (n, m, l) => errors.push({n, m, l});
+  const warn = (n, m, l) => warnings.push({n, m, l});
+
+  // Regel 1: Braucht-Zeile
+  let items = [];
+  const first = lines[0] ?? "";
+  if (!first.startsWith("Braucht: ")) {
+    err(1, 'Zeile 1 muss mit "Braucht: " beginnen (kein Titel davor).', first);
+  } else {
+    const rest = first.slice(9);
+    if (rest === "keine") items = [];
+    else if (rest.trim() === "") err(1, 'Keine Gegenstände angegeben – dann genau "Braucht: keine".', first);
+    else {
+      const parts = rest.split(", ");
+      parts.forEach(p => {
+        if (p === "" || p !== p.trim() || p.includes(",")) err(1, 'Gegenstände mit Komma und genau einem Leerzeichen trennen.', first);
+      });
+      items = [...new Set(parts.map(p => p.replace(/,/g,"").trim()).filter(Boolean))];
+      if (items.some(i => i.toLowerCase() === "keine")) err(1, '"keine" darf nicht mit anderen Gegenständen kombiniert werden.', first);
+    }
+  }
+
+  // Regeln 2–6
+  const cards = [];
+  let section = null, seenW = false, seenS = false, lastWasBlank = false, cardsInSection = 0;
+  for (let i = 1; i < lines.length; i++){
+    const n = i + 1, line = lines[i];
+    if (line === "") { lastWasBlank = true; continue; }
+    const blankBefore = lastWasBlank; lastWasBlank = false;
+
+    if (line.startsWith("#")) {
+      if (line === "# Weitergeben") {
+        if (seenW) err(n, 'Abschnitt "# Weitergeben" doppelt.', line);
+        else if (seenS) err(n, '"# Weitergeben" muss vor "# Selbst" stehen.', line);
+        seenW = true; section = "w"; cardsInSection = 0;
+        if (blankBefore && cards.length === 0 && i > 1) warn(n, "Leerzeile vor dem ersten Abschnitt (nur zwischen Abschnitten vorgesehen).", "");
+      } else if (line === "# Selbst") {
+        if (seenS) err(n, 'Abschnitt "# Selbst" doppelt.', line);
+        if (!seenW) err(n, '"# Weitergeben" fehlt vor "# Selbst".', line);
+        seenS = true; section = "s"; cardsInSection = 0;
+      } else if (/^#\s*(weitergeben|selbst)\s*$/i.test(line)) {
+        err(n, 'Überschrift falsch geschrieben – genau "# Weitergeben" bzw. "# Selbst".', line);
+      } else {
+        err(n, "Weitere Abschnitte oder Kommentare sind nicht erlaubt.", line);
+      }
+      continue;
+    }
+    if (blankBefore && section && cardsInSection > 0) warn(n - 1, "Leerzeile innerhalb eines Abschnitts (nur zwischen Abschnitten vorgesehen).", "");
+    if (!section) { err(n, "Zeile vor dem ersten Abschnitt – Titel oder Text sind nicht erlaubt.", line); continue; }
+
+    const pipes = (line.match(/\|/g) || []).length;
+    if (pipes === 0) { err(n, 'Kein " | " gefunden – Format: Kategorie | Aufgabentext.', line); continue; }
+    if (pipes > 2) { err(n, "Senkrechter Strich im Aufgabentext ist nicht erlaubt.", line); continue; }
+    const parts = line.split("|");
+    const catRaw = parts[0], txtRaw = parts[1], ptsRaw = parts[2];
+    let ok = true;
+
+    if (!/^\S+ $/.test(catRaw)) { err(n, 'Kategorie muss genau ein Wort sein, danach " | ".', line); ok = false; }
+    const cat = catRaw.trim();
+    if (ok && /^\d+[.):]?$/.test(cat)) { err(n, "Nummern sind nicht erlaubt.", line); ok = false; }
+
+    let txt;
+    if (pipes === 1) {
+      if (!/^ \S/.test(txtRaw) || /\s$/.test(txtRaw)) { err(n, 'Nach " | " genau ein Leerzeichen, kein Leerzeichen am Zeilenende.', line); ok = false; }
+    } else {
+      if (!/^ \S/.test(txtRaw) || !/\S $/.test(txtRaw)) {
+        // Unterscheiden: 2 Striche, aber dritter Teil keine Zahl → Strich im Text
+        if (!/^ [0-9]+$/.test(ptsRaw)) { err(n, "Senkrechter Strich im Aufgabentext ist nicht erlaubt.", line); ok = false; }
+        else { err(n, 'Vor und nach " | " je genau ein Leerzeichen.', line); ok = false; }
+      }
+    }
+    txt = (txtRaw || "").trim();
+    if (ok && txt === "") { err(n, "Aufgabentext fehlt.", line); ok = false; }
+
+    let pts = null;
+    if (pipes === 2 && ok) {
+      if (/^ [2-9]$/.test(ptsRaw)) pts = Number(ptsRaw.trim());
+      else if (/^ \d+$/.test(ptsRaw)) { err(n, "Punkte müssen eine ganze Zahl von 2 bis 9 sein.", line); ok = false; }
+      else { err(n, "Senkrechter Strich im Aufgabentext ist nicht erlaubt.", line); ok = false; }
+    }
+    if (ok) { cards.push({ id: cards.length, type: section, cat, text: txt, pts, line: n }); cardsInSection++; }
+  }
+  if (!seenW) err(0, 'Abschnitt "# Weitergeben" fehlt.', "");
+  if (!seenS) err(0, 'Abschnitt "# Selbst" fehlt.', "");
+  if (cards.length === 0 && seenW && seenS) err(0, "Das Deck enthält keine gültige Karte.", "");
+
+  const structural = errors.some(e => e.n <= 1 || e.n === 0 || /Abschnitt "|Überschrift|doppelt|vor "# Selbst"/.test(e.m));
+  return { items, cards, errors, warnings, structural };
+}
+
+/* ---------- Beispieldeck ---------- */
+const SAMPLE = `Braucht: Stift, Zettel, Timer
+# Weitergeben
+Kreativ | Zeichne in 30 Sekunden ein Tier, die andere Person rät.
+Wissen | Nenne fünf Hauptstädte in Europa in 20 Sekunden. | 3
+Musik | Summe ein Lied, bis die andere Person es errät. | 4
+Bewegung | Mach zehn Kniebeugen. | 2
+
+# Selbst
+Erzählen | Erzähle von deinem peinlichsten Moment in der Schule.
+Kreativ | Schreib einen Vierzeiler über die andere Person auf einen Zettel. | 5
+Wissen | Erkläre ein Wort, ohne es zu benutzen – Timer 60 Sekunden. | 3
+Erzählen | Was war dein bester Tag in diesem Jahr?`;
+
+/* ---------- Helpers ---------- */
+const $app = document.getElementById("app");
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function shuffle(a){
+  const r = new Uint32Array(1);
+  for (let i = a.length - 1; i > 0; i--){
+    crypto.getRandomValues(r); const j = r[0] % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+let timerId = null;
+function h(html){ if (timerId) { clearInterval(timerId); timerId = null; } $app.innerHTML = html; window.scrollTo(0,0); }
+function on(sel, ev, fn){ $app.querySelectorAll(sel).forEach(el => el.addEventListener(ev, fn)); }
+function buzz(p){ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} }
+function modal(title, body, buttons){
+  const o = document.createElement("div"); o.className = "overlay";
+  o.innerHTML = `<div class="panel"><h2>${esc(title)}</h2><p class="muted">${body}</p><div class="row">${buttons.map((b,i)=>`<button data-i="${i}" class="${b.cls||"ghost"}">${esc(b.label)}</button>`).join("")}</div></div>`;
+  document.body.appendChild(o);
+  o.querySelectorAll("button").forEach(btn => btn.onclick = () => { o.remove(); const f = buttons[+btn.dataset.i].fn; f && f(); });
+}
+const PALETTE = ["#c2375c","#d4af7a","#9a7bd8","#4fb0a5","#d98352","#6c9be0","#c064a0","#9db565"];
+function catColor(c){ let x = 0; for (const ch of c) x = (x * 31 + ch.codePointAt(0)) >>> 0; return PALETTE[x % PALETTE.length]; }
+const cardKey = c => c.type + "|" + c.cat + "|" + c.text;
+function timerSecs(t){
+  const m = t.match(/(\d+)\s*(Sekunden|Sekunde|Sek\.?|Minuten|Minute|Min\.?)(?![a-zäöü])/i);
+  if (!m) return 0;
+  const s = Number(m[1]) * (/^m/i.test(m[2]) ? 60 : 1);
+  return s > 0 && s <= 3600 ? s : 0;
+}
+const mmss = s => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+
+/* ---------- State ---------- */
+let decks = store.get(K_DECKS, []);
+let prefs = store.get(K_PREFS, { p1:"", p2:"", mode:"waehlen", limit:0 });
+let played = store.get(K_PLAYED, {});       // {deckId:[cardKey]}
+let pending = null;
+let game = store.get(K_GAME, null);
+const saveDecks = () => store.set(K_DECKS, decks);
+const saveGame = () => game ? store.set(K_GAME, game) : store.del(K_GAME);
+const savePlayed = () => store.set(K_PLAYED, played);
+
+/* ---------- Screen: Start ---------- */
+function screenStart(){
+  const resume = game && game.started && !game.ended ? `
+    <div class="panel"><h2>Laufende Runde</h2>
+      <p>${esc(game.deckName)} <span class="muted">· Karte ${Math.min(game.count + 1, game.limit)} von ${game.limit}</span></p>
+      <div class="row"><button class="primary" id="resume">Fortsetzen</button><button class="ghost" id="drop">Verwerfen</button></div>
+    </div>` : "";
+  const list = decks.length ? decks.map(d => {
+    const p = parseDeck(d.raw);
+    return `<div class="deck"><div class="name">${esc(d.name)}<div class="meta">${p.cards.length} Karten${p.errors.length?` · ${p.errors.length} Fehler`:""}</div></div>
+      <button class="small primary" data-play="${d.id}">Spielen</button><button class="small ghost" data-del="${d.id}" aria-label="Löschen">✕</button></div>`;
+  }).join("") : `<p class="muted">Noch keine Decks gespeichert.</p>`;
+
+  h(`<div><h1>Kartenspiel</h1><p class="muted" style="margin-top:6px">Zwei Spieler · ein Handy · eure eigenen Decks</p></div>
+    ${resume}
+    <div class="panel"><h2>Meine Decks</h2>${list}</div>
+    <div class="panel"><h2>Deck importieren</h2>
+      <label class="file"><button class="${decks.length?"ghost":"primary"}" style="width:100%" tabindex="-1">.txt-Datei auswählen</button>
+        <input type="file" id="file" accept=".txt,text/plain"></label>
+      <div class="row"><button class="link" id="sample">Beispieldeck laden</button><button class="link" id="fmt">Format anzeigen</button></div>
+    </div><div style="height:20px"></div>`);
+
+  on("#file","change", e => {
+    const f = e.target.files[0]; if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => openDeck(f.name.replace(/\.txt$/i,""), String(rd.result), true);
+    rd.onerror = () => modal("Fehler", "Die Datei konnte nicht gelesen werden.", [{label:"OK"}]);
+    rd.readAsText(f, "utf-8");
+  });
+  on("#sample","click", () => openDeck("Beispieldeck", SAMPLE, true));
+  on("#fmt","click", () => modal("Format", `<pre class="fmt">${esc("Braucht: Gegenstand, Gegenstand\n# Weitergeben\nKategorie | Aufgabentext\nKategorie | Aufgabentext | 5\n\n# Selbst\nKategorie | Aufgabentext\nKategorie | Aufgabentext | 3")}</pre><br>Punkte optional: 2–9. Kategorie = ein Wort. Kein „|“ im Text, keine Nummern, Titel, Kommentare oder weiteren Abschnitte. Zeitangaben wie „30 Sekunden“ im Text erzeugen automatisch einen Timer.`, [{label:"OK"}]));
+  on("[data-play]","click", e => { const d = decks.find(x => x.id === e.currentTarget.dataset.play); d && openDeck(d.name, d.raw, false, d.id); });
+  on("[data-del]","click", e => {
+    const id = e.currentTarget.dataset.del, d = decks.find(x => x.id === id);
+    modal("Deck löschen?", `„${esc(d.name)}“ wird von diesem Gerät entfernt.`, [{label:"Abbrechen"},{label:"Löschen",cls:"wine",fn:()=>{decks = decks.filter(x=>x.id!==id); delete played[id]; saveDecks(); savePlayed(); screenStart();}}]);
+  });
+  on("#resume","click", screenGame);
+  on("#drop","click", () => modal("Runde verwerfen?", "Der Spielstand geht verloren.", [{label:"Abbrechen"},{label:"Verwerfen",cls:"wine",fn:()=>{game=null;saveGame();screenStart();}}]));
+}
+
+function openDeck(name, raw, isNew, id){
+  const parsed = parseDeck(raw);
+  if (isNew && !(parsed.structural || parsed.cards.length === 0)) {
+    const existing = decks.find(d => d.raw === raw);
+    if (existing) { id = existing.id; name = existing.name; }
+    else { id = "d" + Date.now().toString(36); decks.unshift({ id, name, raw, added: Date.now() }); saveDecks(); }
+  }
+  pending = { id, name, raw, parsed };
+  selCats = null;
+  screenSetup();
+}
+
+/* ---------- Screen: Setup ---------- */
+let selCats = null;
+function screenSetup(){
+  const { parsed } = pending;
+  const cats = [...new Set(parsed.cards.map(c => c.cat))];
+  if (!selCats) { selCats = {}; cats.forEach(c => selCats[c] = true); }
+  const fatal = parsed.structural || parsed.cards.length === 0;
+  const errs = parsed.errors.slice(0, 30).map(e => `<div class="msg err">${e.n ? `Zeile ${e.n}: ` : ""}${esc(e.m)}${e.l ? `<code>${esc(e.l)}</code>` : ""}</div>`).join("")
+    + (parsed.errors.length > 30 ? `<p class="muted">… und ${parsed.errors.length - 30} weitere.</p>` : "");
+  const warns = parsed.warnings.map(w => `<div class="msg warn">Zeile ${w.n}: ${esc(w.m)}</div>`).join("");
+  const pick = parsed.cards.filter(c => selCats[c.cat]);
+  const nW = pick.filter(c => c.type === "w").length, nS = pick.length - nW;
+  const scoring = parsed.cards.some(c => c.pts !== null);
+  const canStart = !fatal && pick.length > 0;
+  const seen = new Set(played[pending.id] || []);
+  const fresh = pick.filter(c => !seen.has(cardKey(c))).length;
+  const limits = [10, 20, 30].filter(n => n < pick.length);
+  if (prefs.limit && !limits.includes(prefs.limit)) prefs.limit = 0;
+
+  h(`<div class="top"><button class="link" id="back">← Decks</button></div>
+    <input class="title" type="text" id="dname" value="${esc(pending.name)}" maxlength="40" aria-label="Deckname" ${fatal?"disabled":""}>
+    ${parsed.errors.length || parsed.warnings.length ? `<div class="panel">
+      ${fatal ? `<div class="msg err"><b>Deck kann nicht geladen werden.</b> Bitte die Datei korrigieren.</div>` :
+        parsed.errors.length ? `<div class="msg warn"><b>${parsed.errors.length} fehlerhafte Zeile(n)</b> werden übersprungen, ${parsed.cards.length} gültige Karten.</div>` : ""}
+      ${errs}${warns}</div>` : ""}
+    ${fatal ? "" : `
+    <p class="muted">${parsed.cards.length} Karten · ${scoring ? "mit Punkten" : "ohne Punkte, keine Wertung"}${parsed.items.length ? ` · braucht: ${esc(parsed.items.join(", "))}` : ""}</p>
+    <div class="panel"><h2>Spieler</h2>
+      <input type="text" id="p1" placeholder="Spieler 1" value="${esc(prefs.p1)}" maxlength="20">
+      <input type="text" id="p2" placeholder="Spieler 2" value="${esc(prefs.p2)}" maxlength="20">
+    </div>
+    <div class="panel"><h2>Ziehen</h2>
+      <div class="seg"><button data-mode="waehlen" class="${prefs.mode==="waehlen"?"on":""}">Stapel wählen</button><button data-mode="zufall" class="${prefs.mode==="zufall"?"on":""}">Gemischt</button></div>
+      <p class="muted">${prefs.mode==="waehlen" ? "Vor jedem Zug „Weitergeben“ oder „Selbst“ wählen." : "Ein Stapel, der Zufall entscheidet."}</p>
+    </div>
+    <div class="panel"><h2>Rundenlänge</h2>
+      <div class="seg">${limits.map(n => `<button data-limit="${n}" class="${prefs.limit===n?"on":""}">${n}</button>`).join("")}<button data-limit="0" class="${!prefs.limit?"on":""}">Alle ${pick.length}</button></div>
+      <p class="muted">${fresh} von ${pick.length} Karten noch ungespielt – sie kommen zuerst.${seen.size ? ` <button class="link" id="resetp" style="padding:0;text-decoration:underline">Zurücksetzen</button>` : ""}</p>
+    </div>
+    ${cats.length > 1 ? `<div class="panel"><div class="top"><h2>Kategorien</h2><button class="link" id="allcats" style="padding:0">${cats.every(c=>selCats[c])?"Keine":"Alle"}</button></div>
+      <div class="chips">${cats.map(c => `<button class="chip ${selCats[c]?"on":""}" style="--c:${catColor(c)}" data-cat="${esc(c)}"><i></i>${esc(c)} <span style="opacity:.6">${parsed.cards.filter(x=>x.cat===c).length}</span></button>`).join("")}</div>
+      <p class="muted">Im Spiel: ${nW} Weitergeben · ${nS} Selbst</p></div>` : ""}
+    <details><summary>Karten ansehen (Spoiler)</summary>${parsed.cards.map(c => `<div class="pv"><b>${c.type==="w"?"W":"S"}</b><span>${esc(c.text)} <span class="muted">· ${esc(c.cat)}${c.pts?` · ${c.pts}`:""}</span></span></div>`).join("")}</details>
+    <div class="bar"><button class="primary" id="go" ${canStart?"":"disabled"}>Runde starten</button></div>`}`);
+
+  const keep = () => {
+    const a = $app.querySelector("#p1"); if (!a) return;
+    prefs.p1 = a.value.trim(); prefs.p2 = $app.querySelector("#p2").value.trim(); store.set(K_PREFS, prefs);
+    const nm = $app.querySelector("#dname").value.trim();
+    if (nm && nm !== pending.name) { pending.name = nm; const d = decks.find(x => x.id === pending.id); if (d) { d.name = nm; saveDecks(); } }
+  };
+  on("#back","click", () => { keep(); screenStart(); });
+  on("#p1,#p2,#dname","change", keep);
+  on("[data-mode]","click", e => { keep(); prefs.mode = e.currentTarget.dataset.mode; store.set(K_PREFS, prefs); screenSetup(); });
+  on("[data-limit]","click", e => { keep(); prefs.limit = Number(e.currentTarget.dataset.limit); store.set(K_PREFS, prefs); screenSetup(); });
+  on("[data-cat]","click", e => { keep(); const c = e.currentTarget.dataset.cat; selCats[c] = !selCats[c]; screenSetup(); });
+  on("#allcats","click", () => { keep(); const all = cats.every(c=>selCats[c]); cats.forEach(c => selCats[c] = !all); screenSetup(); });
+  on("#resetp","click", () => { keep(); delete played[pending.id]; savePlayed(); screenSetup(); });
+  on("#go","click", () => { keep(); startGame(); });
+}
+
+function startGame(){
+  const { parsed, name, id } = pending;
+  const pick = parsed.cards.filter(c => selCats[c.cat]);
+  let seen = new Set(played[id] || []);
+  if (pick.every(c => seen.has(cardKey(c)))) {           // alles durch → Auswahl wieder freigeben
+    const keys = new Set(pick.map(cardKey));
+    played[id] = (played[id] || []).filter(k => !keys.has(k)); savePlayed();
+    seen = new Set(played[id]);
+  }
+  // Ungespielte Karten liegen oben (Array-Ende, pop() zieht von dort)
+  const order = arr => shuffle(arr.filter(c => seen.has(cardKey(c)))).concat(shuffle(arr.filter(c => !seen.has(cardKey(c)))));
+  const p = [prefs.p1 || "Spieler 1", prefs.p2 || "Spieler 2"];
+  game = {
+    deckId: id, deckName: name, items: parsed.items, players: p, mode: prefs.mode,
+    scoring: parsed.cards.some(c => c.pts !== null),
+    piles: prefs.mode === "waehlen"
+      ? { w: order(pick.filter(c => c.type === "w")), s: order(pick.filter(c => c.type === "s")) }
+      : { m: order(pick.slice()) },
+    limit: prefs.limit && prefs.limit < pick.length ? prefs.limit : pick.length,
+    count: 0, active: crypto.getRandomValues(new Uint8Array(1))[0] % 2, current: null, revealed: false,
+    scores: [0,0], stats: [{done:0,rej:0,skip:0},{done:0,rej:0,skip:0}],
+    history: [], checked: {}, ended: false, started: false
+  };
+  saveGame();
+  if (game.items.length) screenChecklist(); else { game.started = true; saveGame(); screenGame(); }
+}
+
+/* ---------- Screen: Checkliste ---------- */
+function screenChecklist(){
+  const all = game.items.every(i => game.checked[i]);
+  h(`<div class="top"><button class="link" id="back">← Zurück</button></div>
+    <div><h1>Bereitlegen</h1><p class="muted" style="margin-top:6px">Das kommt in diesem Deck vor.</p></div>
+    <div class="stack">${game.items.map(i => `<button class="check ${game.checked[i]?"on":""}" data-item="${esc(i)}"><span class="box">${game.checked[i]?"✓":""}</span><span>${esc(i)}</span></button>`).join("")}</div>
+    <div class="bar"><button class="primary" id="go" ${all?"":"disabled"}>Los geht's</button>
+    <button class="link" id="skip">Ohne Abhaken starten</button></div>`);
+  on("[data-item]","click", e => { const i = e.currentTarget.dataset.item; game.checked[i] = !game.checked[i]; saveGame(); screenChecklist(); });
+  const go = () => { game.started = true; saveGame(); screenGame(); };
+  on("#go","click", go); on("#skip","click", go);
+  on("#back","click", () => { game = null; saveGame(); pending ? screenSetup() : screenStart(); });
+}
+
+/* ---------- Screen: Spiel ---------- */
+function remaining(){ const p = game.piles; return (p.w?.length||0) + (p.s?.length||0) + (p.m?.length||0); }
+function snap(){
+  game.history.push(JSON.stringify({ piles: game.piles, current: game.current, revealed: game.revealed, active: game.active, scores: game.scores, stats: game.stats, count: game.count }));
+  if (game.history.length > 20) game.history.shift();
+}
+function screenGame(){
+  if (!game.started) return screenChecklist();
+  if (game.ended) return screenEnd();
+  const act = game.active, other = 1 - act, c = game.current, P = game.players;
+  const head = `<div class="top"><button class="link" id="menu">← Menü</button>
+      <span class="muted">${esc(game.deckName)}</span>
+      <button class="link" id="undo" style="${game.history.length?"":"visibility:hidden"}">Rückgängig</button></div>
+    <div class="score">${[0,1].map(i => `<div class="p ${i===act?"act":""}"><div class="n">${esc(P[i])}</div><div class="v">${game.scoring ? game.scores[i] : game.stats[i].done}</div></div>`).join("")}</div>
+    <div class="prog"><i style="width:${Math.round(game.count / game.limit * 100)}%"></i></div>
+    <p class="note">Karte ${Math.min(game.count + 1, game.limit)} von ${game.limit}${game.scoring ? "" : " · gezählt werden erledigte Aufgaben"}</p>`;
+
+  let body;
+  if (!c) {
+    body = `<div class="turn"><small>Am Zug</small>${esc(P[act])}</div>` + (game.mode === "waehlen"
+      ? `<div class="piles">
+          <button class="pile backface" data-pile="w" ${game.piles.w.length?"":"disabled"}><span class="cnt">${game.piles.w.length} Karten</span><span class="lbl">Weitergeben</span><span class="cnt">an ${esc(P[other])}</span></button>
+          <button class="pile backface self" data-pile="s" ${game.piles.s.length?"":"disabled"}><span class="cnt">${game.piles.s.length} Karten</span><span class="lbl">Selbst</span><span class="cnt">für dich</span></button></div>`
+      : `<div class="piles"><button class="pile backface" data-pile="m"><span class="cnt">${game.piles.m.length} Karten</span><span class="orn">✦</span><span class="lbl">Ziehen</span></button></div>`)
+      + `<div class="bar"><button class="link" id="end">Runde beenden</button></div>`;
+  } else {
+    const isW = c.type === "w", exec = isW ? other : act, pts = c.pts ?? 0, secs = timerSecs(c.text);
+    const len = c.text.length;
+    body = `<div class="flip ${game.revealed?"rev":""}" id="stage"><div class="inner">
+        <div class="face back backface ${isW?"":"self"}" id="reveal" role="button" tabindex="0">
+          <span class="orn">✦</span>
+          <div class="who ${isW?"w":""}">${isW ? "Weitergeben" : "Selbst"}</div>
+          <div class="for">Für ${esc(P[exec])}</div>
+          ${isW ? `<p class="muted">${esc(P[act])} gibt das Handy weiter</p>` : ""}
+          <div class="hint">Tippen zum Aufdecken</div>
+        </div>
+        <div class="face front">
+          <div class="who ${isW?"w":""}">${isW ? `Für ${esc(P[exec])} · von ${esc(P[act])}` : `Für dich, ${esc(P[act])}`}</div>
+          <div class="ctext ${len>150?"l":len>85?"m":""}">${esc(c.text)}</div>
+          ${secs ? `<button class="timer" id="tm" data-s="${secs}">⏱ ${mmss(secs)} starten</button>` : ""}
+          <div class="foot"><span class="tag" style="--c:${catColor(c.cat)}"><i></i>${esc(c.cat)}</span>${game.scoring ? `<span class="pts">${pts ? pts + " P" : "–"}</span>` : ""}</div>
+        </div></div></div>
+      <div class="bar">
+        <div class="pre"><p class="note">Erst aufdecken, wenn ${esc(P[exec])} das Handy hat.</p></div>
+        <div class="acts">
+          <div class="row"><button class="primary" data-res="done">Erledigt${game.scoring && pts ? ` +${pts}` : ""}</button>
+          ${game.scoring ? `<button class="wine" data-res="rej">Ablehnen${pts ? ` −${pts}` : ""}</button>` : ""}</div>
+          ${game.scoring && pts && isW ? `<p class="note">Bei Ablehnung gehen die ${pts} Punkte an ${esc(P[act])}.</p>` : ""}
+          <button class="link" data-res="skip">Überspringen</button>
+        </div></div>`;
+  }
+  h(head + body);
+
+  on("[data-pile]","click", e => {
+    const k = e.currentTarget.dataset.pile; snap();
+    game.current = game.piles[k].pop(); game.revealed = false; saveGame(); screenGame();
+  });
+  const reveal = () => { if (game.revealed) return; game.revealed = true; saveGame(); buzz(15); $app.querySelector("#stage").classList.add("rev"); };
+  on("#reveal","click", reveal);
+  on("#reveal","keydown", e => { if (e.key === "Enter" || e.key === " ") reveal(); });
+  on("#tm","click", e => {
+    const b = e.currentTarget, total = Number(b.dataset.s);
+    if (timerId) { clearInterval(timerId); timerId = null; b.className = "timer"; b.textContent = `⏱ ${mmss(total)} starten`; return; }
+    const end = Date.now() + total * 1000; b.className = "timer run";
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      b.textContent = `⏱ ${mmss(left)}`;
+      if (left <= 0) { clearInterval(timerId); timerId = null; b.className = "timer done"; b.textContent = "Zeit um"; buzz([200,100,200,100,400]); }
+    };
+    tick(); timerId = setInterval(tick, 200);
+  });
+  on("[data-res]","click", e => {
+    const r = e.currentTarget.dataset.res, c = game.current;
+    const giver = game.active, exec = c.type === "w" ? 1 - giver : giver, pts = c.pts ?? 0;
+    snap();
+    if (r === "done") { game.scores[exec] += pts; game.stats[exec].done++; }
+    if (r === "rej")  { game.scores[exec] -= pts; if (c.type === "w") game.scores[giver] += pts; game.stats[exec].rej++; }
+    if (r === "skip") { game.stats[exec].skip++; }
+    (played[game.deckId] = played[game.deckId] || []).push(cardKey(c)); savePlayed();
+    game.count++; game.current = null; game.revealed = false; game.active = 1 - giver;
+    if (game.count >= game.limit || remaining() === 0) game.ended = true;
+    saveGame(); screenGame();
+  });
+  on("#undo","click", undo);
+  on("#menu","click", screenStart);
+  on("#end","click", () => modal("Runde beenden?", "Der aktuelle Stand wird als Ergebnis gewertet.", [{label:"Weiterspielen"},{label:"Beenden",cls:"primary",fn:()=>{ game.ended = true; saveGame(); screenEnd(); }}]));
+}
+function undo(){
+  const s = game.history.pop(); if (!s) return;
+  Object.assign(game, JSON.parse(s)); game.ended = false;
+  if (game.current && played[game.deckId]) {          // Karte gilt wieder als ungespielt
+    const i = played[game.deckId].lastIndexOf(cardKey(game.current));
+    if (i >= 0) { played[game.deckId].splice(i, 1); savePlayed(); }
+  }
+  saveGame(); screenGame();
+}
+
+/* ---------- Screen: Ende ---------- */
+function screenEnd(){
+  const P = game.players;
+  const [s0, s1] = game.scoring ? game.scores : [game.stats[0].done, game.stats[1].done];
+  const title = s0 === s1 ? "Unentschieden" : `${esc(P[s0 > s1 ? 0 : 1])} gewinnt`;
+  h(`<div class="center" style="margin-top:8vh">
+      <p class="who">${esc(game.deckName)} · ${game.count} Karten</p>
+      <div class="big">${title}</div>
+      <div class="final">${s0}<span>:</span>${s1}</div>
+      <p class="muted" style="margin-top:8px">${game.scoring ? "Punkte" : "Erledigte Aufgaben"}</p>
+    </div>
+    <div class="row" style="align-items:stretch">${[0,1].map(i => `<div class="panel"><h2>${esc(P[i])}</h2>
+      <div><div class="res"><span>Erledigt</span><b>${game.stats[i].done}</b></div>
+      ${game.scoring ? `<div class="res"><span>Abgelehnt</span><b>${game.stats[i].rej}</b></div>` : ""}
+      <div class="res" style="border:0"><span>Übersprungen</span><b>${game.stats[i].skip}</b></div></div></div>`).join("")}</div>
+    <div class="bar"><div class="row"><button class="primary" id="again">Neue Runde</button><button class="ghost" id="home">Decks</button></div>
+    ${game.history.length ? `<button class="link" id="undo">Letzten Zug rückgängig</button>` : ""}</div>`);
+  on("#again","click", () => {
+    const d = decks.find(x => x.id === game.deckId);
+    game = null; saveGame();
+    if (d) openDeck(d.name, d.raw, false, d.id); else if (pending) { selCats = null; screenSetup(); } else screenStart();
+  });
+  on("#home","click", () => { game = null; saveGame(); screenStart(); });
+  on("#undo","click", undo);
+}
+
+/* ---------- PWA: Offline + Bildschirm wach halten ---------- */
+if ("serviceWorker" in navigator) { try { navigator.serviceWorker.register("sw.js").catch(()=>{}); } catch(e){} }
+let wake = null;
+async function keepAwake(){
+  try { if (navigator.wakeLock && game && game.started && !game.ended && document.visibilityState === "visible") wake = await navigator.wakeLock.request("screen"); } catch(e){}
+}
+document.addEventListener("visibilitychange", keepAwake);
+document.addEventListener("click", () => { if (!wake || wake.released) keepAwake(); });
+
+screenStart();
+</script>
+</body>
+</html>
