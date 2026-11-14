@@ -151,7 +151,8 @@ const store = {
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } },
   del(k){ try{ localStorage.removeItem(k); }catch(e){} }
 };
-const K_DECKS = "kg.decks.v1", K_GAME = "kg.game.v2", K_PREFS = "kg.prefs.v2", K_PLAYED = "kg.played.v1";
+const K_DECKS = "kg.decks.v1", K_GAME = "kg.game.v2", K_PREFS = "kg.prefs.v2", K_PLAYED = "kg.played.v1", K_ITEMS = "kg.items.v1";
+const APP_VERSION = "2.1";
 
 /* ---------- Parser: exakt nach IMPORTDECK-Formatregeln ---------- */
 function parseDeck(raw){
@@ -253,7 +254,7 @@ function parseDeck(raw){
 /* ---------- Beispieldeck ---------- */
 const SAMPLE = `Braucht: Stift, Zettel, Timer
 # Weitergeben
-Kreativ | Zeichne in 30 Sekunden ein Tier, die andere Person rät.
+Kreativ | Zeichne mit dem Stift in 30 Sekunden ein Tier auf einen Zettel, die andere Person rät.
 Wissen | Nenne fünf Hauptstädte in Europa in 20 Sekunden. | 3
 Musik | Summe ein Lied, bis die andere Person es errät. | 4
 Bewegung | Mach zehn Kniebeugen. | 2
@@ -287,6 +288,18 @@ function modal(title, body, buttons){
 }
 const PALETTE = ["#c2375c","#d4af7a","#9a7bd8","#4fb0a5","#d98352","#6c9be0","#c064a0","#9db565"];
 function catColor(c){ let x = 0; for (const ch of c) x = (x * 31 + ch.codePointAt(0)) >>> 0; return PALETTE[x % PALETTE.length]; }
+// Welche Gegenstände braucht eine Karte? Suche im Aufgabentext: Groß/Klein egal, Endungen toleriert.
+function itemStem(item){
+  const t = item.toLowerCase().trim(), m = t.match(/^(.{4,}?)(en|er|es|e|n|s)$/);
+  return m ? m[1] : t;
+}
+function cardItems(card, items){
+  const text = card.text.toLowerCase();
+  return items.filter(it => {
+    const stem = itemStem(it).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp("(^|[^a-zäöüß])" + stem).test(text);
+  });
+}
 const cardKey = c => c.type + "|" + c.cat + "|" + c.text;
 function timerSecs(t){
   const m = t.match(/(\d+)\s*(Sekunden|Sekunde|Sek\.?|Minuten|Minute|Min\.?)(?![a-zäöü])/i);
@@ -299,6 +312,7 @@ const mmss = s => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 /* ---------- State ---------- */
 let decks = store.get(K_DECKS, []);
 let prefs = store.get(K_PREFS, { p1:"", p2:"", mode:"waehlen", limit:0 });
+let itemPrefs = store.get(K_ITEMS, {});     // {deckId:{Gegenstand:true}} – zuletzt abgehakt
 let played = store.get(K_PLAYED, {});       // {deckId:[cardKey]}
 let pending = null;
 let game = store.get(K_GAME, null);
@@ -326,7 +340,7 @@ function screenStart(){
       <label class="file"><button class="${decks.length?"ghost":"primary"}" style="width:100%" tabindex="-1">.txt-Datei auswählen</button>
         <input type="file" id="file" accept=".txt,text/plain"></label>
       <div class="row"><button class="link" id="sample">Beispieldeck laden</button><button class="link" id="fmt">Format anzeigen</button></div>
-    </div><div style="height:20px"></div>`);
+    </div><p class="note" style="margin:auto 0 calc(14px + env(safe-area-inset-bottom))">Version ${APP_VERSION}</p>`);
 
   on("#file","change", e => {
     const f = e.target.files[0]; if (!f) return;
@@ -367,7 +381,9 @@ function screenSetup(){
   const fatal = parsed.structural || parsed.cards.length === 0;
   const errs = parsed.errors.slice(0, 30).map(e => `<div class="msg err">${e.n ? `Zeile ${e.n}: ` : ""}${esc(e.m)}${e.l ? `<code>${esc(e.l)}</code>` : ""}</div>`).join("")
     + (parsed.errors.length > 30 ? `<p class="muted">… und ${parsed.errors.length - 30} weitere.</p>` : "");
-  const warns = parsed.warnings.map(w => `<div class="msg warn">Zeile ${w.n}: ${esc(w.m)}</div>`).join("");
+  const orphan = parsed.items.filter(it => !parsed.cards.some(c => cardItems(c, [it]).length));
+  const warns = parsed.warnings.map(w => `<div class="msg warn">Zeile ${w.n}: ${esc(w.m)}</div>`).join("")
+    + orphan.map(it => `<div class="msg warn">„${esc(it)}“ steht in der Braucht-Zeile, kommt aber in keinem Aufgabentext vor. Karten dazu lassen sich nicht ausfiltern.</div>`).join("");
   const pick = parsed.cards.filter(c => selCats[c.cat]);
   const nW = pick.filter(c => c.type === "w").length, nS = pick.length - nW;
   const scoring = parsed.cards.some(c => c.pts !== null);
@@ -379,7 +395,7 @@ function screenSetup(){
 
   h(`<div class="top"><button class="link" id="back">← Decks</button></div>
     <input class="title" type="text" id="dname" value="${esc(pending.name)}" maxlength="40" aria-label="Deckname" ${fatal?"disabled":""}>
-    ${parsed.errors.length || parsed.warnings.length ? `<div class="panel">
+    ${parsed.errors.length || warns ? `<div class="panel">
       ${fatal ? `<div class="msg err"><b>Deck kann nicht geladen werden.</b> Bitte die Datei korrigieren.</div>` :
         parsed.errors.length ? `<div class="msg warn"><b>${parsed.errors.length} fehlerhafte Zeile(n)</b> werden übersprungen, ${parsed.cards.length} gültige Karten.</div>` : ""}
       ${errs}${warns}</div>` : ""}
@@ -422,41 +438,57 @@ function screenSetup(){
 function startGame(){
   const { parsed, name, id } = pending;
   const pick = parsed.cards.filter(c => selCats[c.cat]);
+  const p = [prefs.p1 || "Spieler 1", prefs.p2 || "Spieler 2"];
+  const saved = itemPrefs[id] || {};
+  const checked = {}; parsed.items.forEach(i => { if (saved[i]) checked[i] = true; });
+  game = {
+    deckId: id, deckName: name, items: parsed.items, players: p, mode: prefs.mode,
+    scoring: parsed.cards.some(c => c.pts !== null),
+    pool: pick, piles: {}, limitPref: prefs.limit || 0, limit: pick.length,
+    count: 0, active: crypto.getRandomValues(new Uint8Array(1))[0] % 2, current: null, revealed: false,
+    scores: [0,0], stats: [{done:0,rej:0,skip:0},{done:0,rej:0,skip:0}],
+    history: [], checked, ended: false, started: false
+  };
+  saveGame();
+  if (game.items.length) screenChecklist(); else beginRound();
+}
+// Karten, deren Gegenstände alle abgehakt sind
+function availableCards(){
+  return game.pool.filter(c => cardItems(c, game.items).every(i => game.checked[i]));
+}
+function beginRound(){
+  const avail = availableCards(); if (!avail.length) return;
+  const id = game.deckId;
   let seen = new Set(played[id] || []);
-  if (pick.every(c => seen.has(cardKey(c)))) {           // alles durch → Auswahl wieder freigeben
-    const keys = new Set(pick.map(cardKey));
+  if (avail.every(c => seen.has(cardKey(c)))) {          // alles durch → Auswahl wieder freigeben
+    const keys = new Set(avail.map(cardKey));
     played[id] = (played[id] || []).filter(k => !keys.has(k)); savePlayed();
     seen = new Set(played[id]);
   }
   // Ungespielte Karten liegen oben (Array-Ende, pop() zieht von dort)
   const order = arr => shuffle(arr.filter(c => seen.has(cardKey(c)))).concat(shuffle(arr.filter(c => !seen.has(cardKey(c)))));
-  const p = [prefs.p1 || "Spieler 1", prefs.p2 || "Spieler 2"];
-  game = {
-    deckId: id, deckName: name, items: parsed.items, players: p, mode: prefs.mode,
-    scoring: parsed.cards.some(c => c.pts !== null),
-    piles: prefs.mode === "waehlen"
-      ? { w: order(pick.filter(c => c.type === "w")), s: order(pick.filter(c => c.type === "s")) }
-      : { m: order(pick.slice()) },
-    limit: prefs.limit && prefs.limit < pick.length ? prefs.limit : pick.length,
-    count: 0, active: crypto.getRandomValues(new Uint8Array(1))[0] % 2, current: null, revealed: false,
-    scores: [0,0], stats: [{done:0,rej:0,skip:0},{done:0,rej:0,skip:0}],
-    history: [], checked: {}, ended: false, started: false
-  };
-  saveGame();
-  if (game.items.length) screenChecklist(); else { game.started = true; saveGame(); screenGame(); }
+  game.piles = game.mode === "waehlen"
+    ? { w: order(avail.filter(c => c.type === "w")), s: order(avail.filter(c => c.type === "s")) }
+    : { m: order(avail.slice()) };
+  game.limit = game.limitPref && game.limitPref < avail.length ? game.limitPref : avail.length;
+  delete game.pool; game.started = true; saveGame(); screenGame();
 }
 
 /* ---------- Screen: Checkliste ---------- */
 function screenChecklist(){
+  const avail = availableCards().length, total = game.pool.length, gone = total - avail;
+  const need = {}; game.items.forEach(i => need[i] = 0);
+  game.pool.forEach(c => cardItems(c, game.items).forEach(i => need[i]++));
   const all = game.items.every(i => game.checked[i]);
-  h(`<div class="top"><button class="link" id="back">← Zurück</button></div>
-    <div><h1>Bereitlegen</h1><p class="muted" style="margin-top:6px">Das kommt in diesem Deck vor.</p></div>
-    <div class="stack">${game.items.map(i => `<button class="check ${game.checked[i]?"on":""}" data-item="${esc(i)}"><span class="box">${game.checked[i]?"✓":""}</span><span>${esc(i)}</span></button>`).join("")}</div>
-    <div class="bar"><button class="primary" id="go" ${all?"":"disabled"}>Los geht's</button>
-    <button class="link" id="skip">Ohne Abhaken starten</button></div>`);
-  on("[data-item]","click", e => { const i = e.currentTarget.dataset.item; game.checked[i] = !game.checked[i]; saveGame(); screenChecklist(); });
-  const go = () => { game.started = true; saveGame(); screenGame(); };
-  on("#go","click", go); on("#skip","click", go);
+  h(`<div class="top"><button class="link" id="back">← Zurück</button><button class="link" id="allitems">${all ? "Nichts da" : "Alles da"}</button></div>
+    <div><h1>Was ist da?</h1><p class="muted" style="margin-top:6px">Hake ab, was bereitliegt. Karten mit fehlenden Gegenständen kommen nicht ins Spiel.</p></div>
+    <div class="stack">${game.items.map(i => `<button class="check ${game.checked[i]?"on":""}" data-item="${esc(i)}"><span class="box">${game.checked[i]?"✓":""}</span><span style="flex:1">${esc(i)}</span><small class="muted">${need[i] === 1 ? "1 Karte" : need[i] + " Karten"}</small></button>`).join("")}</div>
+    <div class="bar"><p class="note">${gone ? `${avail} von ${total} Karten im Spiel · ${gone} ${gone === 1 ? "fällt" : "fallen"} weg` : `Alle ${total} Karten im Spiel`}</p>
+    <button class="primary" id="go" ${avail ? "" : "disabled"}>${avail ? "Los geht's" : "Keine Karte spielbar"}</button></div>`);
+  const keepItems = () => { itemPrefs[game.deckId] = game.checked; store.set(K_ITEMS, itemPrefs); saveGame(); };
+  on("[data-item]","click", e => { const i = e.currentTarget.dataset.item; if (game.checked[i]) delete game.checked[i]; else game.checked[i] = true; keepItems(); screenChecklist(); });
+  on("#allitems","click", () => { game.checked = {}; if (!all) game.items.forEach(i => game.checked[i] = true); keepItems(); screenChecklist(); });
+  on("#go","click", beginRound);
   on("#back","click", () => { game = null; saveGame(); pending ? screenSetup() : screenStart(); });
 }
 
@@ -467,7 +499,7 @@ function snap(){
   if (game.history.length > 20) game.history.shift();
 }
 function screenGame(){
-  if (!game.started) return screenChecklist();
+  if (!game.started) return game.pool ? screenChecklist() : screenStart();
   if (game.ended) return screenEnd();
   const act = game.active, other = 1 - act, c = game.current, P = game.players;
   const head = `<div class="top"><button class="link" id="menu">← Menü</button>
@@ -508,7 +540,7 @@ function screenGame(){
           <div class="row"><button class="primary" data-res="done">Erledigt${game.scoring && pts ? ` +${pts}` : ""}</button>
           ${game.scoring ? `<button class="wine" data-res="rej">Ablehnen${pts ? ` −${pts}` : ""}</button>` : ""}</div>
           ${game.scoring && pts && isW ? `<p class="note">Bei Ablehnung gehen die ${pts} Punkte an ${esc(P[act])}.</p>` : ""}
-          <button class="link" data-res="skip">Überspringen</button>
+          <div class="row"><button class="ghost small" data-res="back">Zurück in den Stapel</button><button class="ghost small" data-res="skip">Überspringen</button></div>
         </div></div>`;
   }
   h(head + body);
@@ -535,6 +567,12 @@ function screenGame(){
     const r = e.currentTarget.dataset.res, c = game.current;
     const giver = game.active, exec = c.type === "w" ? 1 - giver : giver, pts = c.pts ?? 0;
     snap();
+    if (r === "back") {                                   // ungespielt zurück, gleicher Spieler zieht neu
+      const pile = game.piles[game.mode === "waehlen" ? c.type : "m"];
+      const at = pile.length ? crypto.getRandomValues(new Uint32Array(1))[0] % pile.length : 0;   // nie ganz oben
+      pile.splice(at, 0, c); game.current = null; game.revealed = false;
+      saveGame(); return screenGame();
+    }
     if (r === "done") { game.scores[exec] += pts; game.stats[exec].done++; }
     if (r === "rej")  { game.scores[exec] -= pts; if (c.type === "w") game.scores[giver] += pts; game.stats[exec].rej++; }
     if (r === "skip") { game.stats[exec].skip++; }

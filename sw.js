@@ -1,6 +1,6 @@
 // Service Worker: speichert die App beim ersten Laden und liefert sie danach offline aus.
 // Bei jeder Änderung an der App die Versionsnummer erhöhen, dann holt sich das Handy das Update.
-const VERSION = "kartenspiel-v2.0";
+const VERSION = "kartenspiel-v2.1";
 const FILES = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
